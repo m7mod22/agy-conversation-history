@@ -1,0 +1,5 @@
+{
+  "name": "conversation-history",
+  "version": "1.0.0",
+  "description": "Portable, priority-ranked project conversation history that travels with the project across machines and teammates."
+}
