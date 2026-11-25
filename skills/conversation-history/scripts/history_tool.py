@@ -201,6 +201,21 @@ def safe_resolve_within(project_dir: Path, rel_or_abs: str) -> Path:
     return resolved
 
 
+GENERIC_WORKSPACE_WORDS = {"project", "repo", "repository", "workspace", "codebase"}
+
+
+def default_history_filename(project_dir: Path, project_name: str | None = None) -> str:
+    """Derive a workspace-prefixed filename like Collarms_conversation_history.md."""
+    raw = (project_name or project_dir.resolve().name or "").strip()
+    tokens = re.findall(r"[A-Za-z0-9]+", raw)
+    while len(tokens) > 1 and tokens[-1].lower() in GENERIC_WORKSPACE_WORDS:
+        tokens.pop()
+    if not tokens or (len(tokens) == 1 and tokens[0].lower() in GENERIC_WORKSPACE_WORDS):
+        return "conversation_history.md"
+    prefix = "_".join(tokens)
+    return f"{prefix}_conversation_history.md"
+
+
 def read_config(project_dir: Path) -> dict[str, Any] | None:
     cfg_path = project_dir / CONFIG_REL_PATH
     if not cfg_path.is_file():
@@ -774,6 +789,7 @@ def locate_project(
     return {
         "status": proj_type,
         "project_dir": str(primary),
+        "suggested_filename": default_history_filename(primary),
         "has_portable_setup": (primary / PORTABLE_PLUGIN_REL_PATH / "plugin.json").is_file(),
     }
 
@@ -818,7 +834,8 @@ def cmd_locate(args: argparse.Namespace) -> int:
 
 def cmd_init(args: argparse.Namespace) -> int:
     project_dir = Path(args.project).resolve()
-    target = safe_resolve_within(project_dir, args.path)
+    chosen_path = args.path or default_history_filename(project_dir, args.project_name)
+    target = safe_resolve_within(project_dir, chosen_path)
     if target.exists() and not args.force:
         if file_has_unique_marker(target):
             print(json.dumps({"status": "already_exists", "history_path": str(target)}, indent=2))
@@ -970,7 +987,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_install_project(args: argparse.Namespace) -> int:
     project_dir = Path(args.project).resolve()
-    history_target = safe_resolve_within(project_dir, args.history_path)
+    chosen = args.history_path or default_history_filename(project_dir)
+    history_target = safe_resolve_within(project_dir, chosen)
     rel_path = str(history_target.relative_to(project_dir))
     info = install_portable_project(project_dir, rel_path)
     print(json.dumps({"status": "installed", **info}, indent=2))
@@ -1017,9 +1035,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_loc.add_argument("--no-drift", action="store_true", help="Skip git/transcript drift checks")
     p_loc.set_defaults(func=cmd_locate)
 
-    p_init = sub.add_parser("init", help="Initialize a new conversation_history.md file")
+    p_init = sub.add_parser("init", help="Initialize a new <Workspace>_conversation_history.md file")
     p_init.add_argument("--project", required=True)
-    p_init.add_argument("--path", default="conversation_history.md")
+    p_init.add_argument("--path", default=None, help="Relative path inside project (defaults to <Workspace>_conversation_history.md)")
     p_init.add_argument("--project-name")
     p_init.add_argument("--install-setup", action="store_true")
     p_init.add_argument("--force", action="store_true")
@@ -1044,13 +1062,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_sync.add_argument("--file", required=True)
     p_sync.set_defaults(func=cmd_sync_index)
 
-    p_val = sub.add_parser("validate", help="Validate conversation_history.md structure and rules")
+    p_val = sub.add_parser("validate", help="Validate conversation_history file structure and rules")
     p_val.add_argument("--file", required=True)
     p_val.set_defaults(func=cmd_validate)
 
     p_inst = sub.add_parser("install-project", help="Install portable .agents plugin into project")
     p_inst.add_argument("--project", required=True)
-    p_inst.add_argument("--history-path", default="conversation_history.md")
+    p_inst.add_argument("--history-path", default=None)
     p_inst.set_defaults(func=cmd_install_project)
 
     p_bf = sub.add_parser("backfill-scan", help="Scan local transcripts & git commits for missed work")

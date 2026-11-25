@@ -91,9 +91,10 @@ def handle_payload(payload: dict[str, Any]) -> dict[str, Any]:
             f"{drift_note}{portable_note}"
         )
     elif status == "new_project":
+        suggested = loc.get("suggested_filename", "conversation_history.md")
         msg = (
-            "[conversation-history] New project with no history file. "
-            "Ask the user whether to create conversation_history.md and where in the project folder to locate it."
+            f"[conversation-history] New project with no history file. "
+            f"Ask the user whether to create '{suggested}' and where in the project folder to locate it."
         )
     elif status == "existing_project":
         msg = (

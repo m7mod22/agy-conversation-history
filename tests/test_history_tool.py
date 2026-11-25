@@ -55,6 +55,26 @@ class TestHistoryTool(unittest.TestCase):
         # Empty workspace list returns no_workspace
         self.assertEqual(history_tool.locate_project([], check_drift=False)["status"], "no_workspace")
 
+    def test_default_workspace_keyword_filename(self) -> None:
+        proj = self.tmp_dir / "Collarms Project"
+        proj.mkdir()
+        self.assertEqual(history_tool.default_history_filename(proj), "Collarms_conversation_history.md")
+        loc = history_tool.locate_project([proj], check_drift=False)
+        self.assertEqual(loc["suggested_filename"], "Collarms_conversation_history.md")
+
+        # Calling init without --path uses <Workspace>_conversation_history.md
+        rc = history_tool.main(["init", "--project", str(proj), "--install-setup"])
+        self.assertEqual(rc, 0)
+        self.assertTrue((proj / "Collarms_conversation_history.md").is_file())
+        loc2 = history_tool.locate_project([proj], check_drift=False)
+        self.assertEqual(loc2["status"], "found")
+        self.assertEqual(loc2["history_rel_path"], "Collarms_conversation_history.md")
+
+        # Generic-only folder name falls back cleanly
+        generic = self.tmp_dir / "project"
+        generic.mkdir()
+        self.assertEqual(history_tool.default_history_filename(generic), "conversation_history.md")
+
     def test_init_install_portable_and_custom_location(self) -> None:
         proj = self.tmp_dir / "my_app"
         proj.mkdir()

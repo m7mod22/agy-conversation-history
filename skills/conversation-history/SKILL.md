@@ -37,9 +37,9 @@ Handle the returned `status`:
 
 3. **`status == "new_project"`** (no history file found, folder is empty/newly initialized):
    - Ask the user:
-     1. Would you like to create a `conversation_history` file for this project?
-     2. Where inside the project folder should it be placed? (Default: `conversation_history.md` at project root.)
-   - If yes, run `init --project "<root>" --path "<chosen_relpath>" --install-setup` and record Turn 1 once the first task completes.
+     1. Would you like to create a history file for this project?
+     2. Where inside the project folder should it be placed? (Default: `suggested_filename` from `locate`, e.g. `Collarms_conversation_history.md` at project root.)
+   - If yes, run `init --project "<root>" --install-setup` (or pass `--path "<chosen_relpath>"` if customized) and record Turn 1 once the first task completes.
    - If no, ask if they want to mark the project `opted-out` (`opt-out`) so future sessions don't ask again.
 
 4. **`status == "existing_project"`** (no history file found, project already contains files):

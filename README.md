@@ -1,13 +1,13 @@
 # Antigravity Conversation History Plugin
 
-Persistent, portable, priority-ranked conversation history for **Antigravity** projects. Stores every turn inside the project itself (`conversation_history.md` or a custom project path) so any AI assistant—on your machine, a new computer, or a teammate's setup—immediately understands the full history without drowning in unimportant chatter.
+Persistent, portable, priority-ranked conversation history for **Antigravity** projects. Stores every turn inside the project itself (`<Workspace>_conversation_history.md`, e.g., `Collarms_conversation_history.md`, or a custom project path) so any AI assistant—on your machine, a new computer, or a teammate's setup—immediately understands the full history without drowning in unimportant chatter.
 
 ## Features
 
 - **Unique Project Detection:** Uses `<!-- AGY-CONVERSATION-HISTORY:v1 -->` and `.agents/conversation-history.json` so the skill finds the history file anywhere in the project.
 - **Smart Startup Tree:**
   - **Found:** Reads the **Priority Index** (`P1` -> `P2` -> `P3`) first and checks for drift (new git commits or unrecorded local sessions).
-  - **Missing (New Project):** Asks whether to create `conversation_history.md` and where in the project folder to place it.
+  - **Missing (New Project):** Asks whether to create `<Workspace>_conversation_history.md` (e.g., `Collarms_conversation_history.md`) and where in the project folder to place it.
   - **Missing (Existing Project):** Asks whether a file exists elsewhere to place in a known path, or if the project never had one (generate from available conversation, ask owner, or opt out).
 - **Multi-Priority Remembering (`P1`–`P4`):**
   - `P1` — Hard rules (`always` / `never`)
