@@ -25,19 +25,19 @@ Persistent, portable, priority-ranked conversation history for **Antigravity** p
 
 ### Option 1: Direct Clone (Recommended — Linux / macOS)
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git ~/.gemini/config/plugins/conversation-history
+git clone https://github.com/m7mod22/agy-conversation-history.git ~/.gemini/config/plugins/conversation-history
 ```
 
 ### Option 2: Clone Anywhere & Run Installer
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git
-cd <YOUR_REPO>
+git clone https://github.com/m7mod22/agy-conversation-history.git
+cd agy-conversation-history
 bash install.sh
 ```
 
 ### Option 3: Windows (PowerShell)
 ```powershell
-git clone https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git "$env:USERPROFILE\.gemini\config\plugins\conversation-history"
+git clone https://github.com/m7mod22/agy-conversation-history.git "$env:USERPROFILE\.gemini\config\plugins\conversation-history"
 ```
 *(Note: On Windows, the portable project setup and `rules/AGENTS.md` + `history_tool.py` work out of the box; the optional `hooks.json` `sh -c` lifecycle hooks are Unix-oriented.)*
 
