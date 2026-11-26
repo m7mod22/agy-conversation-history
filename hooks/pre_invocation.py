@@ -87,7 +87,8 @@ def handle_payload(payload: dict[str, Any]) -> dict[str, Any]:
             portable_note = " Portable .agents setup missing; offer install-project."
         msg = (
             f"[conversation-history] Found '{rel}' ({turns} turn(s)). "
-            "Read its Priority Index (P1->P3) before acting, and append the next Turn when done."
+            "Read its Priority Index (P1->P3) first, complete the user's entire task, and ONLY as the very last step "
+            "when everything is finished, append the next Turn via history_tool.py."
             f"{drift_note}{portable_note}"
         )
     elif status == "new_project":

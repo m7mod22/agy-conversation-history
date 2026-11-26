@@ -51,9 +51,9 @@ Handle the returned `status`:
 
 ---
 
-## 2. Recording Every Meaningful Turn
+## 2. Recording a Turn (Strictly as the Very Last Step)
 
-After every meaningful user input or successful AI output (skipping trivial greetings like `"ok"`/`"thanks"` or failed/aborted turns with no output):
+**Never** call `append-turn` at the start or middle of a turn. Complete all research, file edits, commands, and verification for the user's request first, and only **after everything is finished**, record the turn once (skipping trivial greetings like `"ok"`/`"thanks"` or failed/aborted turns with no useful output):
 
 1. **Extract multi-priority points (`P1`–`P4`)** covering every distinct point in the turn (a single turn commonly produces multiple tags—see [format-and-rubric.md](./references/format-and-rubric.md)):
    - `P1`: Hard rules ("always do...", "never do...")
