@@ -58,6 +58,9 @@ def handle_payload(payload: dict[str, Any]) -> dict[str, Any]:
     loc = history_tool.locate_project(dirs, check_drift=True)
     status = loc.get("status")
 
+    if status in ("paused", "opted_out"):
+        return {}
+
     state["startup_injected"] = True
     state["status"] = status
     state["stop_nudges"] = state.get("stop_nudges", {})

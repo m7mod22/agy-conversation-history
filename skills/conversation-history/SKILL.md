@@ -98,3 +98,25 @@ When a user worked on a project without the skill, obtained the skill mid-projec
 2. Also accept any conversation text or export the user provides/pastes (including conversations requested from a teammate).
 3. Distill the unrecorded exchanges (or git commit summary as fallback when no conversation log exists) into chronological `Turn N` entries—each with `User Input`, architecture-level `AI Output` (zero raw code dumps), and multi-priority `Priority Points`—and append them via `append-turn`.
 4. Run `validate --file "<history_path>"` to verify sequential numbering, no raw code blocks, and no unredacted secrets.
+
+---
+
+## 5. Pausing & Resuming (`history-pause` / `history-continue`)
+
+Use these unique commands when you want to save tokens:
+
+- **`history-pause`** (per-project by default; add `--global` to pause all projects):
+  ```bash
+  python3 <path-to>/history_tool.py history-pause --project "<workspace_root>"
+  ```
+  While paused, do **not** read the history file, run `history_tool.py`, or append turns. Hooks stay completely silent (`{}`).
+
+- **`history-continue`** (resumes tracking; add `--global` if paused globally):
+  ```bash
+  python3 <path-to>/history_tool.py history-continue --project "<workspace_root>"
+  ```
+  1. Re-read the **Priority Index** (`P1` -> `P2` -> `P3`) of `history_path` so you remember everything from before the pause.
+  2. Check `pause_gap_drift.has_drift` in the command output:
+     - If `true`, **ask the user** whether they want to backfill the turns/commits from the paused gap (via Section 4) or skip them and only record new turns going forward.
+     - If `false`, confirm tracking is resumed and record following substantive turns as the very last step.
+

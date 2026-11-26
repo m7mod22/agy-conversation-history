@@ -399,6 +399,109 @@ class TestHistoryTool(unittest.TestCase):
             pre_invocation.STATE_DIR = orig_pre_state
             stop_check.STATE_DIR = orig_stop_state
 
+    def test_history_pause_and_continue_project_and_global(self) -> None:
+        proj = self.tmp_dir / "pause_proj"
+        proj.mkdir()
+        subprocess.run(["git", "init", str(proj)], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(proj), "config", "user.email", "t@example.com"], check=True)
+        subprocess.run(["git", "-C", str(proj), "config", "user.name", "Tester"], check=True)
+
+        history_tool.main(["init", "--project", str(proj), "--install-setup"])
+        subprocess.run(["git", "-C", str(proj), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(proj), "commit", "-m", "init"], check=True, capture_output=True)
+
+        # Pause project
+        self.assertEqual(history_tool.main(["history-pause", "--project", str(proj)]), 0)
+        loc_paused = history_tool.locate_project([proj], check_drift=False)
+        self.assertEqual(loc_paused["status"], "paused")
+        self.assertEqual(loc_paused["scope"], "project")
+        self.assertEqual(loc_paused["history_rel_path"], "pause_proj_conversation_history.md")
+
+        # Hooks stay completely silent while paused
+        orig_pre_state = pre_invocation.STATE_DIR
+        orig_stop_state = stop_check.STATE_DIR
+        state_tmp = self.tmp_dir / "pause_hook_state"
+        pre_invocation.STATE_DIR = state_tmp
+        stop_check.STATE_DIR = state_tmp
+        try:
+            tpath = self.tmp_dir / "t_pause.jsonl"
+            tpath.write_text(
+                json.dumps(
+                    {
+                        "step_index": 0,
+                        "type": "PLANNER_RESPONSE",
+                        "content": "Edited files while paused.",
+                        "tool_calls": [{"name": "write_to_file"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                pre_invocation.handle_payload(
+                    {"conversationId": "p1", "workspacePaths": [str(proj)], "invocationNum": 1}
+                ),
+                {},
+            )
+            self.assertEqual(
+                stop_check.handle_payload(
+                    {
+                        "conversationId": "p1",
+                        "executionNum": 1,
+                        "terminationReason": "model_stop",
+                        "workspacePaths": [str(proj)],
+                        "transcriptPath": str(tpath),
+                    }
+                ),
+                {},
+            )
+
+            # Simulate work committed during pause
+            time.sleep(1.1)
+            (proj / "work.py").write_text("print('during pause')\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(proj), "add", "work.py"], check=True)
+            subprocess.run(["git", "-C", str(proj), "commit", "-m", "work during pause"], check=True, capture_output=True)
+
+            # Continue project -> resumes and reports gap drift
+            import io
+            from contextlib import redirect_stdout
+
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = history_tool.main(["history-continue", "--project", str(proj)])
+            self.assertEqual(rc, 0)
+            cont_out = json.loads(buf.getvalue())
+            self.assertEqual(cont_out["status"], "active")
+            self.assertEqual(cont_out["locate_status"], "found")
+            self.assertTrue(cont_out["pause_gap_drift"]["has_drift"])
+            self.assertEqual(cont_out["pause_gap_drift"]["git_commit_count"], 1)
+
+            # Hook now activates cleanly for the resumed session
+            out_after = pre_invocation.handle_payload(
+                {"conversationId": "p1", "workspacePaths": [str(proj)], "invocationNum": 2}
+            )
+            self.assertIn("injectSteps", out_after)
+
+            # Global pause & continue
+            fake_gemini = self.tmp_dir / "fake_gemini_pause"
+            self.assertEqual(
+                history_tool.main(["history-pause", "--project", str(proj), "--global", "--gemini-home", str(fake_gemini)]),
+                0,
+            )
+            loc_g = history_tool.locate_project([proj], gemini_home=fake_gemini, check_drift=False)
+            self.assertEqual(loc_g["status"], "paused")
+            self.assertEqual(loc_g["scope"], "global")
+
+            self.assertEqual(
+                history_tool.main(["history-continue", "--project", str(proj), "--global", "--gemini-home", str(fake_gemini)]),
+                0,
+            )
+            loc_g2 = history_tool.locate_project([proj], gemini_home=fake_gemini, check_drift=False)
+            self.assertEqual(loc_g2["status"], "found")
+        finally:
+            pre_invocation.STATE_DIR = orig_pre_state
+            stop_check.STATE_DIR = orig_stop_state
+
 
 if __name__ == "__main__":
     unittest.main()

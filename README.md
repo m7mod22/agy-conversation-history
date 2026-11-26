@@ -57,11 +57,13 @@ python3 -m unittest discover -s ~/.gemini/config/plugins/conversation-history/te
 TOOL=~/.gemini/config/plugins/conversation-history/skills/conversation-history/scripts/history_tool.py
 
 python3 "$TOOL" locate --project "."
-python3 "$TOOL" init --project "." --path "conversation_history.md" --install-setup
-python3 "$TOOL" install-project --project "." --history-path "conversation_history.md"
+python3 "$TOOL" init --project "." --install-setup
+python3 "$TOOL" install-project --project "." --history-path "<Workspace>_conversation_history.md"
+python3 "$TOOL" history-pause --project "."        # or --global
+python3 "$TOOL" history-continue --project "."     # or --global
 python3 "$TOOL" opt-out --project "."
-python3 "$TOOL" append-turn --file "conversation_history.md" --input "..." --output "..." --points-json '[{"priority":"P1","text":"..."}]'
-python3 "$TOOL" sync-index --file "conversation_history.md"
-python3 "$TOOL" validate --file "conversation_history.md"
+python3 "$TOOL" append-turn --file "<Workspace>_conversation_history.md" --input "..." --output "..." --points-json '[{"priority":"P1","text":"..."}]'
+python3 "$TOOL" sync-index --file "<Workspace>_conversation_history.md"
+python3 "$TOOL" validate --file "<Workspace>_conversation_history.md"
 python3 "$TOOL" backfill-scan --project "."
 ```

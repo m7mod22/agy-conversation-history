@@ -234,6 +234,34 @@ def write_config(project_dir: Path, data: dict[str, Any]) -> Path:
     return cfg_path
 
 
+def _global_pause_path(gemini_home: Path | None = None) -> Path:
+    home = gemini_home or (Path.home() / ".gemini")
+    return home / "config" / "plugins" / "conversation-history" / ".state" / "global_pause.json"
+
+
+def read_global_pause(gemini_home: Path | None = None) -> dict[str, Any] | None:
+    gp = _global_pause_path(gemini_home)
+    if not gp.is_file():
+        return None
+    try:
+        data = json.loads(gp.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) and data.get("paused") else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def write_global_pause(
+    paused: bool, paused_at: str | None = None, gemini_home: Path | None = None
+) -> Path:
+    gp = _global_pause_path(gemini_home)
+    gp.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {"version": 1, "paused": paused}
+    if paused and paused_at:
+        payload["paused_at"] = paused_at
+    gp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return gp
+
+
 def file_has_unique_marker(path: Path) -> bool:
     try:
         if not path.is_file() or path.stat().st_size > 10 * 1024 * 1024:
@@ -728,6 +756,16 @@ def locate_project(
     if not project_dirs:
         return {"status": "no_workspace"}
 
+    gp = read_global_pause(gemini_home)
+    if gp:
+        primary = project_dirs[0].resolve()
+        return {
+            "status": "paused",
+            "scope": "global",
+            "paused_at": gp.get("paused_at", ""),
+            "project_dir": str(primary),
+        }
+
     for project_dir in project_dirs:
         if not project_dir.exists():
             continue
@@ -749,6 +787,22 @@ def locate_project(
                     history_path = candidate
             except ValueError:
                 history_path = None
+
+        if cfg and cfg.get("status") == "paused":
+            rel_path = (
+                str(history_path.resolve().relative_to(project_dir.resolve()))
+                if history_path is not None
+                else cfg.get("historyFile")
+            )
+            return {
+                "status": "paused",
+                "scope": "project",
+                "paused_at": cfg.get("paused_at", ""),
+                "project_dir": str(project_dir.resolve()),
+                "history_path": str(history_path.resolve()) if history_path else None,
+                "history_rel_path": rel_path,
+                "has_portable_setup": has_portable,
+            }
 
         if history_path is None:
             history_path = scan_for_history_file(project_dir)
@@ -876,6 +930,118 @@ def cmd_opt_out(args: argparse.Namespace) -> int:
     project_dir = Path(args.project).resolve()
     cfg = write_config(project_dir, {"version": 1, "status": "opted_out"})
     print(json.dumps({"status": "opted_out", "config_path": str(cfg)}, indent=2))
+    return 0
+
+
+def cmd_history_pause(args: argparse.Namespace) -> int:
+    gemini_home = Path(args.gemini_home) if args.gemini_home else None
+    paused_at = now_iso()
+    if args.is_global:
+        gp = write_global_pause(True, paused_at, gemini_home=gemini_home)
+        print(
+            json.dumps(
+                {
+                    "status": "paused",
+                    "scope": "global",
+                    "paused_at": paused_at,
+                    "state_path": str(gp),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    project_dir = Path(args.project).resolve()
+    existing_cfg = read_config(project_dir) or {}
+    history_rel = existing_cfg.get("historyFile")
+    if not history_rel:
+        found = scan_for_history_file(project_dir)
+        if found is not None:
+            history_rel = str(found.resolve().relative_to(project_dir))
+
+    new_cfg: dict[str, Any] = {"version": 1, "status": "paused", "paused_at": paused_at}
+    if history_rel:
+        new_cfg["historyFile"] = history_rel
+    cfg_path = write_config(project_dir, new_cfg)
+    print(
+        json.dumps(
+            {
+                "status": "paused",
+                "scope": "project",
+                "paused_at": paused_at,
+                "historyFile": history_rel,
+                "config_path": str(cfg_path),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_history_continue(args: argparse.Namespace) -> int:
+    gemini_home = Path(args.gemini_home) if args.gemini_home else None
+    project_dir = Path(args.project).resolve()
+
+    paused_at = ""
+    gp = read_global_pause(gemini_home)
+    if gp:
+        paused_at = str(gp.get("paused_at") or "")
+        write_global_pause(False, None, gemini_home=gemini_home)
+
+    existing_cfg = read_config(project_dir) or {}
+    if not paused_at:
+        paused_at = str(existing_cfg.get("paused_at") or "")
+
+    history_rel = existing_cfg.get("historyFile")
+    if not history_rel:
+        found = scan_for_history_file(project_dir)
+        if found is not None:
+            history_rel = str(found.resolve().relative_to(project_dir))
+
+    if not args.is_global or existing_cfg.get("status") == "paused":
+        new_cfg: dict[str, Any] = {"version": 1, "status": "active"}
+        if history_rel:
+            new_cfg["historyFile"] = history_rel
+        write_config(project_dir, new_cfg)
+
+    loc = locate_project([project_dir], gemini_home=gemini_home, check_drift=False)
+    gap_since = paused_at or loc.get("last_updated") or ""
+    gap_drift: dict[str, Any] = {
+        "has_drift": False,
+        "git_commit_count": 0,
+        "git_commits": [],
+        "unrecorded_sessions": 0,
+    }
+    if loc.get("status") == "found" and gap_since:
+        hist_path = Path(loc["history_path"])
+        commits = detect_git_drift(project_dir, hist_path, gap_since)
+        sessions = scan_transcripts_for_project(
+            project_dir,
+            since_iso=gap_since,
+            gemini_home=gemini_home,
+            max_sessions=5,
+        )
+        gap_drift = {
+            "has_drift": bool(commits or sessions),
+            "git_commit_count": len(commits),
+            "git_commits": commits[:5],
+            "unrecorded_sessions": len(sessions),
+        }
+
+    print(
+        json.dumps(
+            {
+                "status": "active",
+                "locate_status": loc.get("status"),
+                "paused_at": paused_at,
+                "history_path": loc.get("history_path"),
+                "history_rel_path": loc.get("history_rel_path"),
+                "total_turns": loc.get("total_turns", 0),
+                "pause_gap_drift": gap_drift,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -1046,6 +1212,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt = sub.add_parser("opt-out", help="Mark existing project as opted out of history tracking")
     p_opt.add_argument("--project", required=True)
     p_opt.set_defaults(func=cmd_opt_out)
+
+    p_pause = sub.add_parser("history-pause", help="Pause conversation-history tracking to save tokens")
+    p_pause.add_argument("--project", default=".")
+    p_pause.add_argument("--global", dest="is_global", action="store_true", help="Pause globally across all projects")
+    p_pause.add_argument("--gemini-home", help="Override ~/.gemini directory for testing")
+    p_pause.set_defaults(func=cmd_history_pause)
+
+    p_cont = sub.add_parser("history-continue", help="Resume conversation-history tracking and check paused gap")
+    p_cont.add_argument("--project", default=".")
+    p_cont.add_argument("--global", dest="is_global", action="store_true", help="Clear global pause across all projects")
+    p_cont.add_argument("--gemini-home", help="Override ~/.gemini directory for testing")
+    p_cont.set_defaults(func=cmd_history_continue)
 
     p_app = sub.add_parser("append-turn", help="Append a new turn and rebuild Priority Index")
     p_app.add_argument("--file", required=True)
