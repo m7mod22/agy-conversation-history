@@ -852,18 +852,18 @@ def install_portable_project(project_dir: Path, history_rel_path: str) -> dict[s
     """Install self-contained .agents/plugins/conversation-history/ into project_dir."""
     plugin_root = Path(__file__).resolve().parents[3]
     target_root = project_dir.resolve() / PORTABLE_PLUGIN_REL_PATH
-    skills_src = plugin_root / "skills"
-    skills_dst = target_root / "skills"
+    skill_src = plugin_root / "skills"
+    skill_dst = target_root / "skills"
 
     (target_root / "rules").mkdir(parents=True, exist_ok=True)
     shutil.copy2(plugin_root / "plugin.json", target_root / "plugin.json")
     shutil.copy2(plugin_root / "rules" / "AGENTS.md", target_root / "rules" / "AGENTS.md")
 
-    if skills_dst.exists():
-        shutil.rmtree(skills_dst)
+    if skill_dst.exists():
+        shutil.rmtree(skill_dst)
     shutil.copytree(
-        skills_src,
-        skills_dst,
+        skill_src,
+        skill_dst,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
     )
 
