@@ -101,6 +101,8 @@ class TestHistoryTool(unittest.TestCase):
         self.assertTrue((portable_dir / "plugin.json").is_file())
         self.assertTrue((portable_dir / "rules" / "AGENTS.md").is_file())
         self.assertTrue((portable_dir / "skills" / "conversation-history" / "SKILL.md").is_file())
+        self.assertTrue((portable_dir / "skills" / "history-pause" / "SKILL.md").is_file())
+        self.assertTrue((portable_dir / "skills" / "history-continue" / "SKILL.md").is_file())
         self.assertTrue((portable_dir / "skills" / "conversation-history" / "scripts" / "history_tool.py").is_file())
         self.assertFalse((portable_dir / "hooks.json").exists())
 
